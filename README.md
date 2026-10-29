@@ -111,7 +111,8 @@ See `config/config.example.yaml`. Keys that drive behaviour:
 | `risk_limits.max_position_pct` | `0.35` | Per-position cap. Must be ≥ `1/top_n` or every rebalance fails validation. |
 | `risk_limits.max_turnover_pct` | `1.00` | Aggregate turnover cap per run. |
 | `scheduler.snapshot_time` / `execute_time` | `16:05` / `16:10` | Exchange wall-clock times. |
-| `scheduler.rebalance_cadence` | `monthly` | `monthly` = first trading day, or `weekly` / `daily` / `off`. |
+| `scheduler.rebalance_cadence` | `monthly` | `monthly` = first trading day, `weekly` = first trading day of the week, or `daily` / `off`. |
+| `scheduler.rebalance_day` | `sunday` | Weekday for the weekly PDF report. |
 | `signals.retention_days` | `365` | Prune signal logs older than this; `0` keeps everything. |
 | `logging.*` / `paths.logs` | `INFO`, 10 MB | Console + rotating `logs/momentum.log`. |
 

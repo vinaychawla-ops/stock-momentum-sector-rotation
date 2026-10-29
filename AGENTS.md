@@ -9,7 +9,7 @@ This file is the map agents need before editing. It records what the code does n
 - **Strategy:** 12-1 momentum (12-month cumulative return excluding most recent month), top-3 equal-weight, monthly rebalance. Cash buffer when fewer than 3 sectors pass `MIN_MOMENTUM_THRESHOLD = -0.20` (`src/signals/momentum.py`). If 2 pass, each gets 50%.
 - **Universe:** 11 SPDR GICS ETFs — `XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLB, XLU, XLC, XLRE`. `FULL_11` default, `CLASSIC_9` drops `XLC`/`XLRE`.
 - **Universe precedence:** `universe.mode` wins for `full_11`/`classic_9`; `universe.tickers` applies only when `mode` is missing or `custom`. Editing `mode` alone is now enough to switch baskets — don't reintroduce ticker-first resolution.
-- **Market & time:** NYSE. `zoneinfo(config.timezone)` (default `America/New_York`), `XNYS` calendar. Scheduler: `16:05` snapshot on trading days; `16:10` execute on `scheduler.rebalance_cadence` (`monthly` = first trading day by default, or `weekly`/`daily`/`off`); weekly PDF Sunday `21:00`.
+- **Market & time:** NYSE. `zoneinfo(config.timezone)` (default `America/New_York`), `XNYS` calendar. Scheduler: `16:05` snapshot on trading days; `16:10` execute on `scheduler.rebalance_cadence` (`monthly` = first trading day by default; `weekly` = first trading day of the week, because a Sunday trigger is never a session); weekly PDF on `rebalance_day` (Sunday) at `21:00`.
 - **Data source:** yfinance only, `auto_adjust=True`, batch `yf.download`. Fills are **simulated**, not broker-verified.
 - **Fill models:** `next_open` (default) fills at the open of the first session after the snapshot's `asof_close`; `close` fills at the latest close. Unknown values raise at construction.
 - **Currency:** USD `$`.
@@ -171,20 +171,21 @@ Still untested: `engine.py` end-to-end (manually verified for pending → filled
 4. **`compute_monthly_returns` drops only all-NaN rows.** `dropna()` (any) would let one short-history ticker truncate the whole frame.
 5. **Lookback is month-aligned.** `month_floor(end, months)` guarantees 13 monthly returns; the old `months*31+10` arithmetic landed one sample short near month boundaries.
 6. **Universe mode beats tickers.** Both shipped configs used to list all 11 tickers, which silently disabled `classic_9`.
-7. **`_XNYS` is captured at import.** If `pandas_market_calendars` is missing, `_is_trading_day` and `_is_first_trading_day_of_month` fall back to weekday logic; tests must not assume holidays.
-8. **Scheduler dedupe key is `(date, HH:MM, job)`.** A new job needs its own name; reusing one silently swallows the second trigger.
-9. **`execution.mode` gates scheduler fills.** Default `dry_run` keeps the scheduler read-only even when trades are generated.
-10. **Risk defaults mirror the YAML now** (`0.35` / `1.00`) and warn when keys are missing. Earlier fallbacks were `0.25`/`0.50`, which rejected valid 33% targets.
-11. **Equal weight sits 1.7pp under the cap.** 33.33% vs `0.35`; the engine warns when `1/top_n` exceeds the cap, because then every rebalance fails validation.
-12. **`max_turnover_pct: 1.00` is intentional** — initial cash deployment is ~100% turnover. Tighten it only after the first rebalance.
-13. **Signal logs are per run, not per day.** Filenames include time and mode; `get_signals_history` sorts by name (chronological) and flattens legacy list files.
-14. **Retention deletes by filename date.** A file with an unparseable prefix is skipped, not deleted.
-15. **yfinance is unofficial and delayed (~15m).** Rate limits surface as `get_current_prices` returning `{}`; the engine now aborts rather than trading a partial portfolio, and the broker skips symbols without a reference price.
-16. **`seed` snapshots claim `data_source: yfinance` with no prices fetched.** Expected — it is an all-cash ledger.
-17. **`python main.py pull` still invokes `snapshot`** after the deprecation notice.
-18. **Printed output is ASCII.** `--` and `|` replaced the em dash and middot that cp1252 terminals rendered as `?`; keep new output ASCII.
-19. **`stats`/`slippage` take positional dates.** `--start` is an argparse error.
-20. **`fill_model` is validated at broker construction**, so a typo fails before any order is priced.
+7. **`_XNYS` is captured at import.** If `pandas_market_calendars` is missing, `_is_trading_day`, `_is_first_trading_day_of_month` and `_is_first_trading_day_of_week` fall back to weekday logic; tests must not assume holidays.
+8. **`weekly` cadence means the first trading day of the week, not `rebalance_day`.** An execute bound to Sunday could never run: both the tick guard and `job_execute` reject non-sessions. `rebalance_day` now only schedules the weekly PDF.
+9. **Scheduler dedupe key is `(date, HH:MM, job)`.** A new job needs its own name; reusing one silently swallows the second trigger.
+10. **`execution.mode` gates scheduler fills.** Default `dry_run` keeps the scheduler read-only even when trades are generated.
+11. **Risk defaults mirror the YAML now** (`0.35` / `1.00`) and warn when keys are missing. Earlier fallbacks were `0.25`/`0.50`, which rejected valid 33% targets.
+12. **Equal weight sits 1.7pp under the cap.** 33.33% vs `0.35`; the engine warns when `1/top_n` exceeds the cap, because then every rebalance fails validation.
+13. **`max_turnover_pct: 1.00` is intentional** — initial cash deployment is ~100% turnover. Tighten it only after the first rebalance.
+14. **Signal logs are per run, not per day.** Filenames include time and mode; `get_signals_history` sorts by name (chronological) and flattens legacy list files.
+15. **Retention deletes by filename date.** A file with an unparseable prefix is skipped, not deleted.
+16. **yfinance is unofficial and delayed (~15m).** Rate limits surface as `get_current_prices` returning `{}`; the engine now aborts rather than trading a partial portfolio, and the broker skips symbols without a reference price.
+17. **`seed` snapshots claim `data_source: yfinance` with no prices fetched.** Expected — it is an all-cash ledger.
+18. **`python main.py pull` still invokes `snapshot`** after the deprecation notice.
+19. **Printed output is ASCII.** `--` and `|` replaced the em dash and middot that cp1252 terminals rendered as `?`; keep new output ASCII.
+20. **`stats`/`slippage` take positional dates.** `--start` is an argparse error.
+21. **`fill_model` is validated at broker construction**, so a typo fails before any order is priced.
 
 ## 8. Deployment
 

@@ -65,8 +65,8 @@ scheduler:
   # All times are exchange wall-clock in `timezone` below
   snapshot_time: "16:05"   # after NYSE close 16:00 ET
   execute_time: "16:10"
-  rebalance_cadence: monthly  # monthly (first trading day) | weekly | daily | off
-  rebalance_day: sunday       # only used when cadence=weekly; also drives the weekly report
+  rebalance_cadence: monthly  # monthly (first trading day) | weekly (first trading day of the week) | daily | off
+  rebalance_day: sunday       # day the weekly PDF report is generated
   report_time: "21:00"
 
 logging:

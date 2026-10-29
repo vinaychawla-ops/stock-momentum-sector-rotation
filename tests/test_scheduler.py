@@ -33,9 +33,15 @@ def test_rebalance_cadence_monthly():
 
 
 def test_rebalance_cadence_weekly_daily_off():
-    weekly = {"rebalance_cadence": "weekly", "rebalance_day": "sunday"}
-    assert _rebalance_due(datetime(2026, 9, 6, 20, 0, tzinfo=NY), weekly) is True  # Sunday
-    assert _rebalance_due(datetime(2026, 9, 8, 20, 0, tzinfo=NY), weekly) is False  # Tuesday
+    weekly = {"rebalance_cadence": "weekly"}
+    # Labor Day 2026-09-07 closes Monday, so that week starts Tuesday 09-08
+    assert _rebalance_due(datetime(2026, 9, 8, 16, 10, tzinfo=NY), weekly) is True
+    assert _rebalance_due(datetime(2026, 9, 9, 16, 10, tzinfo=NY), weekly) is False
+    # A Sunday is never a session, so it can never be the trigger
+    assert _rebalance_due(datetime(2026, 9, 6, 16, 10, tzinfo=NY), weekly) is False
+    # Ordinary week: Monday 09-14
+    assert _rebalance_due(datetime(2026, 9, 14, 16, 10, tzinfo=NY), weekly) is True
+    assert _rebalance_due(datetime(2026, 9, 15, 16, 10, tzinfo=NY), weekly) is False
 
     assert _rebalance_due(datetime(2026, 9, 15, 16, 10, tzinfo=NY), {"rebalance_cadence": "daily"}) is True
     assert _rebalance_due(datetime(2026, 9, 1, 16, 10, tzinfo=NY), {"rebalance_cadence": "off"}) is False

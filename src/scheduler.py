@@ -86,6 +86,23 @@ def _is_first_trading_day_of_month(d: Optional[datetime] = None, tz: Optional[Zo
     return first == target
 
 
+def _is_first_trading_day_of_week(d: Optional[datetime] = None, tz: Optional[ZoneInfo] = None) -> bool:
+    """True when `d` is the first XNYS session of its ISO week."""
+    d = d or datetime.now(tz or _tz())
+    target = d.date()
+    monday = target - timedelta(days=target.weekday())
+    sunday = monday + timedelta(days=6)
+    if _XNYS is not None:
+        try:
+            import pandas as pd
+            sched = _XNYS.schedule(start_date=pd.Timestamp(monday), end_date=pd.Timestamp(sunday))
+            if not sched.empty:
+                return sched.index[0].date() == target
+        except Exception:  # noqa: BLE001
+            pass
+    return target == monday
+
+
 def _rebalance_due(now: datetime, sched_cfg: dict) -> bool:
     cadence = str(sched_cfg.get("rebalance_cadence", "monthly")).lower()
     if cadence == "off":
@@ -93,8 +110,10 @@ def _rebalance_due(now: datetime, sched_cfg: dict) -> bool:
     if cadence == "daily":
         return True
     if cadence == "weekly":
-        day = str(sched_cfg.get("rebalance_day", "sunday")).lower()
-        return now.strftime("%A").lower() == day
+        # The first *trading* day of the week, not a fixed weekday: the
+        # configured rebalance_day (Sunday) is never a session, so an
+        # execute bound to it could never fill.
+        return _is_first_trading_day_of_week(now)
     if cadence == "monthly":
         return _is_first_trading_day_of_month(now)
     logger.warning(f"Unknown rebalance_cadence {cadence!r}; treating as monthly")
@@ -239,7 +258,7 @@ def run_scheduler(config: dict, health_port: int = 8080) -> None:
     if cadence == "monthly":
         print(f"Execute:  {execute_time} on the first trading day of each month")
     elif cadence == "weekly":
-        print(f"Execute:  {execute_time} every {rebalance_day.title()}")
+        print(f"Execute:  {execute_time} on the first trading day of each week")
     elif cadence == "daily":
         print(f"Execute:  {execute_time} every trading day")
     else:
