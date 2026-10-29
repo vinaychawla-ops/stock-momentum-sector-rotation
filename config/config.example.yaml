@@ -1,0 +1,83 @@
+# US Momentum — Yahoo Finance (Paper Trading)
+# Copy to config.yaml and adjust.
+
+# Exchange calendar is XNYS (NYSE). Wall-clock scheduling uses `timezone`.
+timezone: America/New_York
+
+universe:
+  tickers:
+    - XLK  # Technology
+    - XLF  # Financials
+    - XLE  # Energy
+    - XLV  # Health Care
+    - XLY  # Consumer Discretionary
+    - XLP  # Consumer Staples
+    - XLI  # Industrials
+    - XLB  # Materials
+    - XLU  # Utilities
+    - XLC  # Communication Services
+    - XLRE # Real Estate
+  # `mode` wins for the two named baskets; use `custom` to trade `tickers`.
+  # full_11 = all 11, classic_9 = drops XLC/XLRE for UK parity.
+  mode: full_11
+
+paths:
+  executions: data/executions
+  snapshots: data/snapshots
+  annotations: data/annotations
+  reports: reports/monthly
+  logs: logs
+
+paper:
+  initial_cash: 100000.0
+  currency: USD
+
+data:
+  provider: yfinance
+  fill_model: next_open  # next_open | close
+  slippage_bps: 5        # modeled slippage per fill (basis points)
+  commission_per_share: 0.00  # USD per share; 0 = commission-free model
+  retry_attempts: 2
+  auto_adjust: true
+
+execution:
+  mode: dry_run  # dry_run or live (both are paper; live writes fills)
+  fill_model: next_open
+
+position_sizing:
+  top_n: 3
+  exit_rank_threshold: 5
+  min_trade_threshold: 0.02  # 2% weight diff to trigger
+  min_trade_shares: 1
+  min_trade_value: 100
+
+risk_limits:
+  max_position_pct: 0.35   # single position cap (33.3% for top-3 needs 35% to pass)
+  max_turnover_pct: 1.00   # daily turnover guard (1.00 allows initial cash deployment; 0.50 to enforce later)
+  kill_switch_file: data/.kill_switch
+
+signals:
+  log_dir: data/signals
+  retention_days: 365      # prune signal logs older than this; 0 disables pruning
+
+scheduler:
+  health_port: 8080
+  # All times are exchange wall-clock in `timezone` below
+  snapshot_time: "16:05"   # after NYSE close 16:00 ET
+  execute_time: "16:10"
+  rebalance_cadence: monthly  # monthly (first trading day) | weekly | daily | off
+  rebalance_day: sunday       # only used when cadence=weekly; also drives the weekly report
+  report_time: "21:00"
+
+logging:
+  level: INFO
+  max_bytes: 10485760
+  backup_count: 5
+
+email:
+  enabled: false
+  smtp_host: smtp.gmail.com
+  smtp_port: 587
+  sender_email: ""
+  sender_password: ""
+  recipient_email: ""

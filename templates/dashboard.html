@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>US Momentum Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+<div class="navbar bg-slate-900 text-white">
+  <div class="flex-1">
+    <span class="text-lg font-bold">US Momentum — Paper</span>
+    <span class="ml-3 badge badge-sm bg-amber-400 text-slate-900 border-0">Yahoo Finance · NYSE</span>
+    <span class="ml-2 badge badge-sm badge-outline text-white">Paper fills: {{ fill_model }} + slippage</span>
+  </div>
+  <div class="flex gap-2">
+    <a href="/" class="btn btn-sm btn-ghost">Dashboard</a>
+    <a href="/signals" class="btn btn-sm btn-ghost">Signals</a>
+  </div>
+</div>
+<div class="max-w-6xl mx-auto p-6 space-y-6">
+  <div class="alert alert-warning text-sm">
+    <span>⚠️ Paper trading via Yahoo Finance — fills are simulated ({{ fill_model }} + modeled slippage). Not broker-verified. Data source: {{ data_source }}</span>
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="card bg-white shadow"><div class="card-body p-4"><div class="text-xs uppercase tracking-widest text-slate-500">Total Equity</div><div class="text-2xl font-bold">${{ "%.2f"|format(total_equity) }}</div><div class="text-xs text-slate-500">{{ snapshot_timestamp }}</div></div></div>
+    <div class="card bg-white shadow"><div class="card-body p-4"><div class="text-xs uppercase tracking-widest text-slate-500">Cash</div><div class="text-2xl font-bold">${{ "%.2f"|format(cash) }}</div><div class="text-xs text-slate-500">USD</div></div></div>
+    <div class="card bg-white shadow"><div class="card-body p-4"><div class="text-xs uppercase tracking-widest text-slate-500">Today P&L</div><div class="text-2xl font-bold {% if today_pnl>=0 %}text-emerald-600{% else %}text-red-600{% endif %}">${{ "%.2f"|format(today_pnl) }}</div></div></div>
+    <div class="card bg-white shadow"><div class="card-body p-4"><div class="text-xs uppercase tracking-widest text-slate-500">Total Return</div><div class="text-2xl font-bold {% if total_return>=0 %}text-emerald-600{% else %}text-red-600{% endif %}">{{ "%.2f"|format(total_return) }}%</div><div class="text-xs text-slate-500">P&L ${{ "%.2f"|format(total_pnl) }}</div></div></div>
+  </div>
+
+  <div class="card bg-white shadow">
+    <div class="card-body">
+      <h3 class="font-semibold">Equity Curve</h3>
+      <canvas id="equityChart" height="120"></canvas>
+      <div class="text-xs text-slate-500 mt-2">Mark-to-market at yfinance close · Rebalance: Top-3 equal weight · Next Sunday in {{ days_to_rebalance }} days</div>
+    </div>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="card bg-white shadow">
+      <div class="card-body">
+        <h3 class="font-semibold">Current Positions</h3>
+        {% if positions %}
+        <div class="overflow-auto">
+          <table class="table table-sm">
+            <thead><tr><th>Symbol</th><th>Qty</th><th>Avg Cost</th><th>Mkt</th><th>Value</th><th>Weight</th><th>P&L</th></tr></thead>
+            <tbody>
+            {% for p in positions %}
+              <tr>
+                <td><span class="badge badge-sm bg-slate-900 text-white">{{ p.symbol }}</span></td>
+                <td>{{ p.quantity }}</td>
+                <td>${{ "%.2f"|format(p.avg_cost) }}</td>
+                <td>${{ "%.2f"|format(p.market_price) }}</td>
+                <td>${{ "%.0f"|format(p.market_value) }}</td>
+                <td>{{ "%.1f"|format(p.weight*100) }}%</td>
+                <td class="{% if p.unrealized_pnl>=0 %}text-emerald-600{% else %}text-red-600{% endif %}">${{ "%.0f"|format(p.unrealized_pnl) }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-sm text-slate-500">No positions — all cash. Run <code>python main.py seed</code> then <code>execute --live</code>.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card bg-white shadow">
+      <div class="card-body">
+        <h3 class="font-semibold">12-1 Momentum Signal</h3>
+        {% if signal_data %}
+        <table class="table table-sm">
+          <thead><tr><th>Rank</th><th>Symbol</th><th>Sector</th><th>12-1 Mom</th><th>Target</th></tr></thead>
+          <tbody>
+          {% for r in signal_data %}
+            <tr class="{% if r.target_weight>0 %}bg-blue-50{% endif %}">
+              <td>{{ r.rank }}</td>
+              <td><span class="badge badge-sm">{{ r.symbol }}</span></td>
+              <td class="text-xs">{{ r.sector }}</td>
+              <td class="{% if r.momentum>=0 %}text-emerald-600{% else %}text-red-600{% endif %}">{{ "%.1f"|format(r.momentum*100) }}%</td>
+              <td>{{ "%.1f"|format(r.target_weight*100) }}%</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-sm text-slate-500">Signal unavailable — check yfinance connectivity.</div>
+        {% endif %}
+        <div class="text-xs text-slate-500 mt-2">Source: Yahoo Finance · Last updated {{ last_updated }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const equityData = {{ equity_data | safe }};
+const ctx = document.getElementById('equityChart');
+if (ctx && equityData.dates.length) {
+  new Chart(ctx, {
+    type: 'line',
+    data: { labels: equityData.dates, datasets: [{ label: 'Equity ($)', data: equityData.values, borderColor: '#0f172a', backgroundColor: 'rgba(15,23,42,0.06)', fill: true, tension: 0.2 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false } } }
+  });
+}
+</script>
+</body>
+</html>

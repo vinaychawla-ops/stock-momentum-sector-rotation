@@ -1,0 +1,20 @@
+version: "3.8"
+services:
+  scheduler:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./reports:/app/reports
+      - ./logs:/app/logs
+    ports:
+      - "8080:8080"
+    command: python main.py scheduler
+  dashboard:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+    ports:
+      - "5050:5050"
+    command: python main.py dashboard --host 0.0.0.0 --port 5050

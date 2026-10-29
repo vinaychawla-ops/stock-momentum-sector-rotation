@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Signals — US Momentum</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+<div class="navbar bg-slate-900 text-white"><div class="flex-1"><span class="font-bold">Signals History</span><span class="ml-2 badge badge-sm">{{ signal_count }} signals</span></div><div class="flex gap-2"><a href="/" class="btn btn-sm btn-ghost">Dashboard</a><a href="/signals" class="btn btn-sm btn-ghost">Signals</a></div></div>
+<div class="max-w-6xl mx-auto p-6 space-y-4">
+  {% if kill_switch_active %}
+  <div class="alert alert-error"><span>Kill switch ACTIVE: {{ kill_switch_reason }} — all trading blocked</span></div>
+  {% else %}
+  <div class="alert alert-success text-sm"><span>Kill switch inactive · Execution mode: {{ execution_mode }} (paper) · Last updated {{ last_updated }}</span></div>
+  {% endif %}
+  {% for s in signals %}
+  <div class="card bg-white shadow">
+    <div class="card-body p-4">
+      <div class="flex justify-between items-start gap-4">
+        <div><div class="font-semibold">{{ s.date }} <span class="badge badge-sm">{{ s.mode }}</span> <span class="badge badge-sm {% if s.validation_status=='Passed' %}badge-success{% else %}badge-error{% endif %}">{{ s.validation_status }}</span></div><div class="text-xs text-slate-500">{{ s.timestamp }}</div></div>
+        <div class="text-xs text-right"><div>Top: {{ s.top_sectors|join(', ') }}</div><div>Trades: {{ s.trade_count }} ({{ s.buy_count }} buys, {{ s.sell_count }} sells) · Executed: {{ s.executed_count }}</div></div>
+      </div>
+      {% if s.trades %}
+      <div class="overflow-auto mt-3">
+        <table class="table table-xs"><thead><tr><th>Symbol</th><th>Action</th><th>Shares</th><th>Price</th><th>Reason</th></tr></thead><tbody>
+        {% for t in s.trades %}<tr><td>{{ t.symbol }}</td><td><span class="badge badge-xs {% if t.action=='BUY' %}badge-success{% else %}badge-error{% endif %}">{{ t.action }}</span></td><td>{{ t.shares }}</td><td>${{ "%.2f"|format(t.price) }}</td><td class="text-xs">{{ t.reason }}</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+      {% endif %}
+      {% if s.rankings %}
+      <details class="mt-2"><summary class="text-xs cursor-pointer text-slate-600">Rankings</summary><div class="overflow-auto mt-2"><table class="table table-xs"><thead><tr><th>Rank</th><th>Symbol</th><th>Momentum</th><th>Weight</th></tr></thead><tbody>
+        {% for r in s.rankings %}<tr><td>{{ r.rank }}</td><td>{{ r.symbol }}</td><td>{{ "%.2f"|format(r.momentum_12_1*100) }}%</td><td>{{ "%.1f"|format(r.target_weight*100) }}%</td></tr>{% endfor %}
+      </tbody></table></div></details>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% if not signals %}<div class="card bg-white shadow p-8 text-center text-slate-500">No signals yet. Run <code>python main.py execute</code></div>{% endif %}
+</div>
+</body>
+</html>
